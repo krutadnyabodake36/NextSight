@@ -8,14 +8,6 @@ NextSight is an open-architecture, displayless Wearable IoT (WIoT) smart glasses
 
 ```text
 NextSight/
-├── cad/                                  # 3D Printing CAD Files & OpenSCAD Source
-│   ├── nextsight_glasses.scad            # Master parametric CAD model (OpenSCAD)
-│   ├── front_frame.stl                   # Front frame with 21mm bridge & camera mount
-│   ├── left_temple.stl                   # Left temple (enclosing 3.7V LiPo & MAX98357A)
-│   ├── right_temple.stl                  # Right temple (enclosing ESP32-S3, mic & touch)
-│   ├── bridge_wire_channel_lid.stl       # Snap-in retention cover for bridge wire conduit
-│   └── nextsight_glasses_all_parts.stl   # Complete single-bed 3D print layout
-│
 ├── firmware/                             # ESP32-S3 Dual-Core FreeRTOS Firmware
 │   └── firmware.ino                      # Production firmware (I2S DMA, dynamic noise gate, mDNS fallback)
 │

@@ -34,6 +34,11 @@ generate_*.py
 reports/
 firmware_backup/
 
+# CAD models and 3D print assets
+cad/
+*.stl
+*.scad
+
 # Operating system artifacts
 .DS_Store
 Thumbs.db
