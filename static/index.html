@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NextSight OS // Hardware Console & Neural HUD</title>
+  
+  <!-- CDNs: Tailwind CSS, Alpine.js, Lucide Icons, Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Custom Scrollbar for sleek Linear/Stripe engineering look */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    [x-cloak] { display: none !important; }
+
+    /* Animated Vision Feed Scanline Sweep */
+    @keyframes scanline {
+      0% {
+        top: -10%;
+        opacity: 0;
+      }
+      15% {
+        opacity: 0.85;
+      }
+      85% {
+        opacity: 0.85;
+      }
+      100% {
+        top: 110%;
+        opacity: 0;
+      }
+    }
+    .animate-scanline {
+      animation: scanline 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+  </style>
+</head>
+<body 
+  x-data="nextSight()" 
+  x-init="initApp()" 
+  class="bg-slate-50 text-slate-800 font-sans min-h-screen selection:bg-indigo-500/15 selection:text-indigo-700 flex flex-col antialiased [background-image:radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"
+>
+
+  <!-- Top Executive Header Console (Span 12) -->
+  <header class="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-slate-200/80 px-6 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+    <div class="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Left: Branding & Hardware ID -->
+      <div class="flex items-center gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <i data-lucide="glasses" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-slate-900 tracking-tight text-base">NextSight OS</span>
+            <span class="text-[10px] font-mono font-semibold tracking-wider uppercase bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200/70">Console v2.5</span>
+          </div>
+          <div class="text-[11px] font-medium text-slate-500 tracking-wide flex items-center gap-2">
+            <span>Operator: <strong class="text-slate-700 font-semibold">Krutadnya Bodake</strong></span>
+            <span class="text-slate-300">•</span>
+            <span class="font-mono text-slate-400" x-text="state.system_time || '00:00:00'"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Hardware & Telemetry Status Badges -->
+      <div class="flex flex-wrap items-center gap-2.5 text-xs font-mono">
+        
+        <!-- ESP32 Hardware Link Badge -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-slate-200/80 shadow-sm text-slate-600">
+          <span class="relative flex h-2 w-2">
+            <span :class="state.esp32_ip ? 'animate-ping bg-emerald-400' : 'bg-amber-400'" class="absolute inline-flex h-full w-full rounded-full opacity-75"></span>
+            <span :class="state.esp32_ip ? 'bg-emerald-500' : 'bg-amber-500'" class="relative inline-flex rounded-full h-2 w-2"></span>
+          </span>
+          <span class="font-medium" x-text="state.esp32_ip ? `ESP32: ${state.esp32_ip}` : 'ESP32: Standby Simulator'"></span>
+        </div>
+
+        <!-- Assistant Audio State Badge -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 shadow-sm"
+             :class="state.audio_state === 'ACTIVE_LISTENING' ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white/90 border-slate-200/80 text-slate-600'">
+          <i data-lucide="mic" class="w-3.5 h-3.5" :class="state.audio_state === 'ACTIVE_LISTENING' ? 'text-amber-600 animate-pulse' : 'text-slate-400'"></i>
+          <span class="font-semibold" x-text="state.audio_state === 'ACTIVE_LISTENING' ? 'HOT MIC (8s LISTEN)' : 'IDLE (WAIT WAKE WORD)'"></span>
+        </div>
+
+        <!-- Vision Mode Badge -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 shadow-sm"
+             :class="state.vision_mode_active ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white/90 border-slate-200/80 text-slate-500'">
+          <i data-lucide="eye" class="w-3.5 h-3.5" :class="state.vision_mode_active ? 'text-indigo-600' : 'text-slate-400'"></i>
+          <span class="font-semibold" x-text="state.vision_mode_active ? 'VISION ACTIVE' : 'VISION STANDBY'"></span>
+        </div>
+
+        <!-- Pipeline Status -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-slate-200/80 shadow-sm text-slate-600">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-indigo-500"></i>
+          <span class="font-medium" x-text="state.pipeline_status || 'Ready'"></span>
+        </div>
+
+        <!-- On-Demand Weather Pill -->
+        <div 
+          @click="fetchWeather()"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 shadow-sm cursor-pointer hover:border-sky-300 hover:bg-sky-50/60 group"
+          :class="state.latest_weather ? 'bg-sky-50/80 border-sky-200 text-sky-800' : 'bg-white/90 border-slate-200/80 text-slate-500'"
+          title="Click to check live weather on-demand"
+        >
+          <template x-if="state.latest_weather">
+            <div class="flex items-center gap-1.5">
+              <i :data-lucide="state.latest_weather.icon || 'cloud-sun'" class="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform"></i>
+              <span class="font-semibold" x-text="`${state.latest_weather.city} ${state.latest_weather.temperature}°C`"></span>
+              <span class="text-[10px] text-sky-600/80 font-normal hidden sm:inline" x-text="`• ${state.latest_weather.condition}`"></span>
+            </div>
+          </template>
+          <template x-if="!state.latest_weather">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-500 transition-colors"></i>
+              <span class="font-medium text-slate-500 group-hover:text-slate-700">Check Weather</span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Live Active Countdown Timer Pill -->
+        <template x-if="state.active_timers && state.active_timers.length > 0">
+          <div 
+            @click="cancelTimer(state.active_timers[0].id)"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 shadow-sm cursor-pointer hover:bg-rose-50 hover:border-rose-300 hover:text-rose-800 transition group"
+            title="Click to cancel active timer"
+          >
+            <i data-lucide="timer" class="w-3.5 h-3.5 text-emerald-600 animate-pulse group-hover:hidden"></i>
+            <i data-lucide="x" class="w-3.5 h-3.5 text-rose-600 hidden group-hover:inline"></i>
+            <span class="font-bold font-mono text-emerald-700 group-hover:text-rose-700" x-text="state.active_timers[0].time_left"></span>
+            <span class="text-[10px] text-emerald-700/80 font-normal hidden sm:inline group-hover:text-rose-600" x-text="`• ${state.active_timers[0].label}`"></span>
+          </div>
+        </template>
+
+        <!-- Live Playback Streaming & Instant Barge-In Cutoff Pill -->
+        <template x-if="state.is_playback_streaming">
+          <button 
+            type="button"
+            @click="triggerBargeIn()"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 border border-violet-300 text-violet-800 shadow-sm cursor-pointer hover:bg-rose-50 hover:border-rose-300 hover:text-rose-800 transition group animate-pulse"
+            title="Click to instantly cut off speech (Barge In)"
+          >
+            <i data-lucide="volume-2" class="w-3.5 h-3.5 text-violet-600 group-hover:hidden"></i>
+            <i data-lucide="square" class="w-3.5 h-3.5 text-rose-600 hidden group-hover:inline"></i>
+            <span class="font-bold text-violet-700 group-hover:text-rose-700">Speaking</span>
+            <span class="text-[10px] text-violet-600/80 font-normal hidden sm:inline group-hover:text-rose-600">• Tap to Barge In</span>
+          </button>
+        </template>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Bento Grid Container (12 Columns) -->
+  <main class="flex-1 max-w-[1720px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- ======================================================== -->
+    <!-- LEFT COLUMN (Span 8): Hardware Viewfinder & Camera Stream -->
+    <!-- ======================================================== -->
+    <div class="lg:col-span-8 bg-white/85 backdrop-blur-lg border border-slate-200/80 rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-300">
+      
+      <!-- Card Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+            <i data-lucide="camera" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 tracking-tight">Hardware Viewfinder HUD</h2>
+            <p class="text-[11px] text-slate-500">Live 16:9 feed & zero-disk memory buffer</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-2 font-mono text-xs">
+          <span class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium" 
+                x-text="state.last_image_time ? `FRAME: ${state.last_image_time}` : 'LIVE STREAM'"></span>
+          <span class="px-2.5 py-1 rounded-md border font-semibold"
+                :class="state.vision_mode_active ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-100 border-slate-200 text-slate-400'"
+                x-text="state.vision_mode_active ? 'MULTIMODAL ON' : 'STANDBY'"></span>
+        </div>
+      </div>
+
+      <!-- 16:9 Viewfinder Viewport with Corner Crosshairs & Scanline -->
+      <div class="relative my-5 w-full aspect-[16/9] bg-slate-900 rounded-xl overflow-hidden border border-slate-800/80 flex items-center justify-center shadow-inner group">
+        
+        <!-- Live Image Stream / Buffer Feed -->
+        <template x-if="state.latest_frame_url && state.vision_mode_active">
+          <div class="relative w-full h-full flex items-center justify-center bg-black">
+            <img 
+              :src="state.latest_frame_url" 
+              alt="Live Viewfinder Feed" 
+              class="w-full h-full object-contain select-none"
+            />
+            <!-- Animated Horizontal Scanline Sweep -->
+            <div class="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent shadow-[0_0_12px_rgba(99,102,241,0.9)] animate-scanline pointer-events-none"></div>
+          </div>
+        </template>
+
+        <!-- Illustrated Standby State with Engaging Action Button -->
+        <template x-if="!state.vision_mode_active">
+          <div class="flex flex-col items-center justify-center gap-4 text-center px-6 py-8">
+            <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-400 shadow-lg">
+              <i data-lucide="camera-off" class="w-8 h-8"></i>
+            </div>
+            <div class="max-w-md">
+              <h3 class="text-base font-bold text-white tracking-tight">Vision Inactive</h3>
+              <p class="text-xs text-slate-400 font-sans mt-1">Single-tap the glass temple touch sensor or engage multimodal vision below to process real-time scenes.</p>
+            </div>
+            <button 
+              @click="simulateTouch('single')"
+              class="mt-1 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white text-xs font-semibold shadow-md shadow-indigo-500/25 transition-all active:scale-95"
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Engage Multimodal Vision</span>
+            </button>
+          </div>
+        </template>
+
+        <!-- Subtle Inner Vignette Overlay -->
+        <div class="absolute inset-0 pointer-events-none shadow-[inset_0_0_40px_rgba(0,0,0,0.5)]"></div>
+
+        <!-- Glass Corner Crosshairs [ ] -->
+        <div class="absolute inset-0 pointer-events-none p-4">
+          <!-- Top Left -->
+          <div class="absolute top-4 left-4 w-5 h-5 border-t-2 border-l-2 border-indigo-400/80 rounded-tl-sm"></div>
+          <!-- Top Right -->
+          <div class="absolute top-4 right-4 w-5 h-5 border-t-2 border-r-2 border-indigo-400/80 rounded-tr-sm"></div>
+          <!-- Bottom Left -->
+          <div class="absolute bottom-4 left-4 w-5 h-5 border-b-2 border-l-2 border-indigo-400/80 rounded-bl-sm"></div>
+          <!-- Bottom Right -->
+          <div class="absolute bottom-4 right-4 w-5 h-5 border-b-2 border-r-2 border-indigo-400/80 rounded-br-sm"></div>
+          
+          <!-- Center Reticle (Visible when vision active) -->
+          <div x-show="state.vision_mode_active" class="absolute inset-0 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-full border border-indigo-400/30 flex items-center justify-center">
+              <div class="w-1.5 h-1.5 bg-indigo-400/80 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Frame Telemetry Overlay Tag -->
+        <div class="absolute bottom-3 left-3 flex items-center gap-2 pointer-events-none">
+          <span class="px-2.5 py-1 rounded-md bg-black/75 backdrop-blur-md border border-slate-700 text-[11px] font-mono text-slate-300 font-medium"
+                x-text="state.last_image_bytes ? `${(state.last_image_bytes/1024).toFixed(1)} KB` : 'RAM: 0 KB'"></span>
+          <span class="px-2.5 py-1 rounded-md bg-black/75 backdrop-blur-md border border-slate-700 text-[11px] font-mono text-indigo-300 font-medium"
+                x-show="state.vision_mode_active">1080p OCR CLAHE</span>
+        </div>
+
+      </div>
+
+      <!-- Minimal Frame Injection Dropzone (Bottom of Viewfinder) -->
+      <div 
+        @dragover.prevent="isDragging = true" 
+        @dragleave.prevent="isDragging = false" 
+        @drop.prevent="handleDrop($event)"
+        class="border border-dashed rounded-xl p-3.5 transition-all text-center flex items-center justify-between gap-4 cursor-pointer"
+        :class="isDragging ? 'border-indigo-500 bg-indigo-50/60' : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'"
+        @click="$refs.fileInput.click()"
+      >
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shadow-sm">
+            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          </div>
+          <div class="text-left">
+            <p class="text-xs font-semibold text-slate-800">Inject Test Frame to Zero-Disk RAM</p>
+            <p class="text-[11px] font-mono text-slate-500">Drag & drop photo or browse local image to simulate camera ingest</p>
+          </div>
+        </div>
+        <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect($event)">
+        <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-medium text-slate-700 hover:text-indigo-600 shadow-sm transition">Browse File</span>
+      </div>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- RIGHT COLUMN (Span 4): Telemetry Deck & Simulation Bay   -->
+    <!-- ======================================================== -->
+    <div class="lg:col-span-4 flex flex-col gap-6">
+      
+      <!-- Telemetry Deck (Latency & Live Waveform Visualizer) -->
+      <div class="bg-white/85 backdrop-blur-lg border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
+        
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+              <i data-lucide="gauge" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 tracking-tight">Latency Telemetry</h2>
+              <p class="text-[11px] text-slate-500">Edge STT • Gemini LLM • Edge TTS</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Target &lt; 2.0s</span>
+        </div>
+
+        <!-- 4-Tile Bento Latency Grid -->
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          
+          <!-- Tile 1: STT Inference -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+            <div class="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider flex items-center justify-between">
+              <span>STT Inference</span>
+              <i data-lucide="mic" class="w-3 h-3 text-slate-400"></i>
+            </div>
+            <div class="text-xl font-bold font-mono mt-2" 
+                 :class="getLatencyClass(state.latest_latency?.vad_to_stt)" 
+                 x-text="state.latest_latency?.vad_to_stt ? `${state.latest_latency.vad_to_stt.toFixed(2)}s` : '--'">
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 font-mono">Whisper Base.en</div>
+          </div>
+
+          <!-- Tile 2: LLM First Token -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+            <div class="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider flex items-center justify-between">
+              <span>LLM 1st Token</span>
+              <i data-lucide="zap" class="w-3 h-3 text-slate-400"></i>
+            </div>
+            <div class="text-xl font-bold font-mono mt-2" 
+                 :class="getLatencyClass(state.latest_latency?.llm_first_token)" 
+                 x-text="state.latest_latency?.llm_first_token ? `${state.latest_latency.llm_first_token.toFixed(2)}s` : '--'">
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 font-mono">Gemini 3.5 Flash</div>
+          </div>
+
+          <!-- Tile 3: TTS Generation -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+            <div class="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider flex items-center justify-between">
+              <span>TTS 1st Chunk</span>
+              <i data-lucide="volume-2" class="w-3 h-3 text-slate-400"></i>
+            </div>
+            <div class="text-xl font-bold font-mono mt-2" 
+                 :class="getLatencyClass(state.latest_latency?.tts_first_chunk)" 
+                 x-text="state.latest_latency?.tts_first_chunk ? `${state.latest_latency.tts_first_chunk.toFixed(2)}s` : '--'">
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 font-mono">Edge Neural Jenny</div>
+          </div>
+
+          <!-- Tile 4: Total Round-trip -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+            <div class="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider flex items-center justify-between">
+              <span>Total Pipeline</span>
+              <i data-lucide="timer" class="w-3 h-3 text-slate-400"></i>
+            </div>
+            <div class="text-xl font-bold font-mono mt-2" 
+                 :class="getLatencyClass(state.latest_latency?.total)" 
+                 x-text="state.latest_latency?.total ? `${state.latest_latency.total.toFixed(2)}s` : '--'">
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 font-mono">End-to-Ear Total</div>
+          </div>
+
+        </div>
+
+        <!-- Dynamic Audio Waveform Strip (2D Canvas) -->
+        <div class="mt-4 pt-3.5 border-t border-slate-100">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <i data-lucide="activity" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>VAD Voice Waveform</span>
+            </div>
+            <span class="text-[10px] font-mono uppercase font-semibold"
+                  :class="state.audio_state === 'ACTIVE_LISTENING' ? 'text-amber-600 animate-pulse' : 'text-slate-400'"
+                  x-text="state.audio_state === 'ACTIVE_LISTENING' ? 'HOT MIC CAPTURING' : 'RESTING FLATLINE'">
+            </span>
+          </div>
+
+          <!-- Live Canvas Visualizer -->
+          <div class="w-full h-14 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 relative">
+            <canvas id="audioWaveformCanvas" class="w-full h-full block"></canvas>
+            <div class="absolute inset-0 pointer-events-none bg-gradient-to-r from-slate-900/40 via-transparent to-slate-900/40"></div>
+          </div>
+        </div>
+
+        <!-- Telemetry Footer / Mic Specs -->
+        <div class="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+          <span>Mic Noise Floor: <strong class="text-slate-700" x-text="`${state.noise_floor || 450} RMS`"></strong></span>
+          <span>Model: <strong class="text-indigo-600" x-text="state.model_name || 'gemini-3.5-flash-lite'"></strong></span>
+        </div>
+
+      </div>
+
+      <!-- Hardware Simulation Bay (Neo-skeuomorphic Tactile Controls) -->
+      <div class="bg-white/85 backdrop-blur-lg border border-slate-200/80 rounded-2xl p-6 flex-1 flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-300">
+        
+        <div>
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <i data-lucide="touchpad" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-slate-900 tracking-tight">Hardware Simulator Bay</h2>
+                <p class="text-[11px] text-slate-500">TTP223 capacitive touch & voice emulator</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Non-blocking</span>
+          </div>
+
+          <!-- Tactile Neo-Skeuomorphic Touch Buttons -->
+          <div class="grid grid-cols-3 gap-2.5 my-4">
+            
+            <!-- Single Tap -->
+            <button 
+              @click="simulateTouch('single')"
+              class="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-slate-100 hover:bg-white active:scale-95 transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-sm border border-slate-200/90 text-slate-700 hover:text-indigo-600 group"
+              title="Toggle Multimodal Vision Mode & Start 8s Listen"
+            >
+              <i data-lucide="mouse-pointer-click" class="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform"></i>
+              <span class="text-xs font-semibold">Single Tap</span>
+              <span class="text-[10px] font-mono text-slate-400 uppercase">Vision</span>
+            </button>
+
+            <!-- Double Tap -->
+            <button 
+              @click="simulateTouch('double')"
+              class="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-slate-100 hover:bg-white active:scale-95 transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-sm border border-slate-200/90 text-slate-700 hover:text-emerald-600 group"
+              title="Save High-Res Snapshot to Gallery"
+            >
+              <i data-lucide="camera" class="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform"></i>
+              <span class="text-xs font-semibold">Double Tap</span>
+              <span class="text-[10px] font-mono text-slate-400 uppercase">Snapshot</span>
+            </button>
+
+            <!-- Long Press -->
+            <button 
+              @click="simulateTouch('long')"
+              class="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-slate-100 hover:bg-white active:scale-95 transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-sm border border-slate-200/90 text-slate-700 hover:text-rose-600 group"
+              title="Flush AI Conversation Memory"
+            >
+              <i data-lucide="trash-2" class="w-4 h-4 text-rose-600 group-hover:scale-110 transition-transform"></i>
+              <span class="text-xs font-semibold">Long Press</span>
+              <span class="text-[10px] font-mono text-slate-400 uppercase">Clear Mem</span>
+            </button>
+
+          </div>
+        </div>
+
+        <!-- Voice Shortcut Simulator Chips -->
+        <div class="flex items-center gap-1.5 mb-2 overflow-x-auto pb-1 text-[11px] font-mono text-slate-500">
+          <span class="text-[10px] uppercase text-slate-400 font-semibold flex-shrink-0">Quick Ask:</span>
+          <button 
+            type="button"
+            @click="queryText = 'What is the weather like?'; sendQuery()"
+            class="px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-[10px] transition flex-shrink-0 flex items-center gap-1"
+          >
+            <i data-lucide="cloud-sun" class="w-3 h-3"></i>
+            <span>Weather</span>
+          </button>
+          <button 
+            type="button"
+            @click="queryText = 'Will it rain today?'; sendQuery()"
+            class="px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-[10px] transition flex-shrink-0 flex items-center gap-1"
+          >
+            <i data-lucide="cloud-rain" class="w-3 h-3"></i>
+            <span>Rain?</span>
+          </button>
+          <button 
+            type="button"
+            @click="queryText = 'Set a timer for 30 seconds'; sendQuery()"
+            class="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] transition flex-shrink-0 flex items-center gap-1"
+          >
+            <i data-lucide="timer" class="w-3 h-3"></i>
+            <span>30s Timer</span>
+          </button>
+          <button 
+            type="button"
+            @click="queryText = 'What are my notes?'; sendQuery()"
+            class="px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] transition flex-shrink-0 flex items-center gap-1"
+          >
+            <i data-lucide="notebook-pen" class="w-3 h-3"></i>
+            <span>Notes</span>
+          </button>
+          <button 
+            type="button"
+            @click="triggerBargeIn()"
+            class="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] transition flex-shrink-0 flex items-center gap-1 font-semibold"
+            title="Instant Barge-In cutoff"
+          >
+            <i data-lucide="zap-off" class="w-3 h-3 text-rose-600"></i>
+            <span>Barge In</span>
+          </button>
+        </div>
+
+        <!-- Linear/Stripe Console Voice Query Input Bar -->
+        <form @submit.prevent="sendQuery()" class="mt-1">
+          <label class="block text-[11px] font-mono uppercase text-slate-500 font-semibold mb-1.5">Simulate Voice Query</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-3.5 text-indigo-600 font-mono text-xs font-bold">&gt; _</span>
+            <input 
+              type="text" 
+              x-model="queryText" 
+              placeholder="Ask anything (e.g., What is in front of me?)" 
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-mono transition shadow-sm"
+            />
+            <button 
+              type="submit" 
+              class="absolute right-2 text-slate-400 hover:text-indigo-600 p-1.5 transition"
+              title="Transmit Simulated Speech"
+            >
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </form>
+
+      </div>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- BOTTOM SECTION: Dialogue Stream (8) & Scratchpad (4)     -->
+    <!-- ======================================================== -->
+    <div class="lg:col-span-8 bg-white/85 backdrop-blur-lg border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col gap-5">
+      
+      <!-- Dialogue Stream Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+            <i data-lucide="message-square" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 tracking-tight">Dialogue Stream & Task Ledger</h2>
+            <p class="text-[11px] text-slate-500">Live multi-turn conversation and snapshot archive</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono text-slate-500" x-text="`${(state.chat_history || []).length} Exchanges`"></span>
+          <button 
+            @click="simulateTouch('long')"
+            class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-mono text-slate-600 transition"
+          >
+            Clear History
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrolling Message Feed with Structured Bubbles -->
+      <div 
+        x-ref="chatBox"
+        class="h-72 overflow-y-auto pr-3 space-y-4 flex flex-col"
+      >
+        <!-- Empty State -->
+        <template x-if="!state.chat_history || state.chat_history.length === 0">
+          <div class="flex-1 flex flex-col items-center justify-center text-slate-400 text-center py-10">
+            <i data-lucide="sparkles" class="w-8 h-8 text-slate-300 mb-2"></i>
+            <p class="text-xs font-medium text-slate-500">No voice interactions recorded yet.</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Speak "Hey Meta" to your glasses or transmit a simulated query above.</p>
+          </div>
+        </template>
+
+        <!-- Message List -->
+        <template x-for="(msg, index) in (state.chat_history || [])" :key="index">
+          <div class="flex flex-col">
+            
+            <!-- User Prompt Entry (Right-aligned Indigo Bubble) -->
+            <template x-if="msg.role === 'user'">
+              <div class="flex justify-end mb-2">
+                <div class="max-w-[75%] bg-indigo-600 text-white rounded-2xl rounded-br-none px-4 py-2.5 shadow-sm">
+                  <div class="flex items-center justify-between gap-3 mb-1">
+                    <span class="text-[10px] font-mono tracking-wider uppercase text-indigo-200 font-semibold">User Voice</span>
+                    <span class="text-[10px] font-mono text-indigo-200/80" x-text="msg.time"></span>
+                  </div>
+                  <p class="text-xs font-normal leading-relaxed text-white select-text" x-text="msg.text"></p>
+                </div>
+              </div>
+            </template>
+
+            <!-- AI Response Entry (Left-aligned Clean White Bubble with Fine Border) -->
+            <template x-if="msg.role === 'assistant'">
+              <div class="flex justify-start mb-2">
+                <div class="max-w-[80%] bg-white border border-slate-200/90 text-slate-800 rounded-2xl rounded-bl-none px-4 py-2.5 shadow-sm">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-600 text-white flex items-center justify-center text-[9px] font-bold">N</div>
+                    <span class="text-[11px] font-bold text-slate-900">NextSight</span>
+                    <template x-if="msg.has_vision">
+                      <span class="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-mono font-semibold">VISION</span>
+                    </template>
+                    <span class="text-[10px] font-mono text-slate-400 ml-auto" x-text="msg.time"></span>
+                  </div>
+                  <p class="text-xs font-normal leading-relaxed text-slate-700 select-text" x-text="msg.text"></p>
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+      </div>
+
+      <!-- Snapshot Gallery Archive Ribbon -->
+      <template x-if="state.gallery_images && state.gallery_images.length > 0">
+        <div class="pt-4 border-t border-slate-100">
+          <div class="text-xs font-mono text-slate-500 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+            <span class="font-semibold text-slate-700">Snapshot Archive</span>
+            <span class="text-indigo-600 font-medium" x-text="`${state.gallery_images.length} Photos Captured`"></span>
+          </div>
+          <div class="flex items-center gap-3 overflow-x-auto pb-1">
+            <template x-for="imgUrl in state.gallery_images" :key="imgUrl">
+              <div 
+                @click="openModal(imgUrl)"
+                class="w-24 h-16 rounded-xl overflow-hidden border border-slate-200 hover:border-indigo-500 cursor-pointer flex-shrink-0 transition-all hover:scale-105 shadow-sm bg-slate-100"
+              >
+                <img :src="imgUrl" class="w-full h-full object-cover" loading="lazy" />
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+    </div>
+
+    <!-- Wearable Scratchpad & Voice Notes (Span 4) -->
+    <div class="lg:col-span-4 bg-white/85 backdrop-blur-lg border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between gap-4">
+      
+      <div>
+        <!-- Card Header -->
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shadow-amber-500/10">
+              <i data-lucide="notebook-pen" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 tracking-tight">Wearable Scratchpad</h2>
+              <p class="text-[11px] text-slate-500">Persistent voice notes & ideas</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
+                  x-text="`${(state.notes || []).length} Notes`"></span>
+            <template x-if="state.notes && state.notes.length > 0">
+              <button 
+                @click="clearNotes()"
+                title="Clear all notes"
+                class="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+              >
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Add Note Input Bar -->
+        <div class="mt-4 flex items-center gap-2">
+          <div class="relative flex-1">
+            <input 
+              type="text" 
+              x-model="noteInputText"
+              @keydown.enter.prevent="addNote()"
+              placeholder="Type note or say 'Take a note'..." 
+              class="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-800 placeholder-slate-400 font-sans"
+            />
+            <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+          </div>
+          <button 
+            @click="addNote()"
+            class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition flex items-center gap-1"
+          >
+            <span>Save</span>
+          </button>
+        </div>
+
+        <!-- Active Countdown Timers Ribbon -->
+        <template x-if="state.active_timers && state.active_timers.length > 0">
+          <div class="mt-3.5 p-3 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-300/80 shadow-xs flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+                <i data-lucide="timer" class="w-3.5 h-3.5 text-emerald-600 animate-pulse"></i>
+                <span>Active Timers</span>
+                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800" x-text="state.active_timers.length"></span>
+              </div>
+              <button 
+                @click="clearTimers()" 
+                class="text-[10px] font-mono text-emerald-700 hover:text-rose-600 transition"
+                title="Cancel all timers"
+              >
+                Clear All
+              </button>
+            </div>
+            <div class="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+              <template x-for="t in state.active_timers" :key="t.id">
+                <div class="flex items-center justify-between p-2 rounded-lg bg-white/95 border border-emerald-200/90 shadow-xs">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping flex-shrink-0"></span>
+                    <span class="text-xs font-medium text-slate-800 truncate" x-text="t.label"></span>
+                    <span class="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 flex-shrink-0" x-text="t.type"></span>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-xs font-mono font-bold text-emerald-700" x-text="t.time_left"></span>
+                    <button 
+                      @click="cancelTimer(t.id)" 
+                      title="Cancel timer"
+                      class="text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
+                    >
+                      <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- Notes Scrollable List -->
+        <div class="h-64 overflow-y-auto mt-4 pr-1 space-y-2.5">
+          <!-- Empty State -->
+          <template x-if="!state.notes || state.notes.length === 0">
+            <div class="h-full flex flex-col items-center justify-center text-slate-400 text-center py-10">
+              <i data-lucide="sticky-note" class="w-7 h-7 text-slate-300 mb-2"></i>
+              <p class="text-xs font-medium text-slate-500">No voice notes saved.</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Say "Take a note: [message]" or type above.</p>
+            </div>
+          </template>
+
+          <!-- Notes Items -->
+          <template x-for="note in (state.notes || [])" :key="note.id">
+            <div class="p-3 rounded-xl bg-white border border-slate-200/90 shadow-sm hover:border-amber-300 transition-all group flex flex-col gap-1.5">
+              <div class="flex items-start justify-between gap-2">
+                <p class="text-xs text-slate-800 leading-relaxed font-normal select-text flex-1" x-text="note.text"></p>
+                <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                  <button 
+                    @click="copyNote(note.text)"
+                    title="Copy note"
+                    class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                  >
+                    <i data-lucide="copy" class="w-3 h-3"></i>
+                  </button>
+                  <button 
+                    @click="deleteNote(note.id)"
+                    title="Delete note"
+                    class="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                  >
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100">
+                <span x-text="note.date"></span>
+                <span x-text="note.time"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Footer Voice Commands Help Tip -->
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span>Trigger: <strong class="text-slate-600">"Take a note..."</strong></span>
+        <span>Query: <strong class="text-slate-600">"Read my notes"</strong></span>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Modal Preview for Snapshots -->
+  <div 
+    x-show="modalUrl" 
+    x-cloak
+    @keydown.escape.window="modalUrl = null"
+    class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+    @click.self="modalUrl = null"
+  >
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100">
+        <span class="text-xs font-mono font-semibold text-slate-700" x-text="modalUrl ? modalUrl.split('/').pop() : ''"></span>
+        <button @click="modalUrl = null" class="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 transition">✕</button>
+      </div>
+      <div class="p-4 bg-slate-950 flex items-center justify-center max-h-[60vh]">
+        <img :src="modalUrl" class="max-h-[55vh] object-contain rounded-lg" />
+      </div>
+      <div class="p-4 border-t border-slate-100 flex justify-between bg-slate-50/50">
+        <button 
+          @click="deleteSnapshot(modalUrl)"
+          class="px-3.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-mono font-medium hover:bg-rose-100 transition"
+        >
+          Delete Snapshot
+        </button>
+        <div class="flex gap-2">
+          <a :href="modalUrl" download class="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-mono font-medium hover:bg-slate-50 shadow-sm transition">Download</a>
+          <button @click="modalUrl = null" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-mono font-medium hover:bg-indigo-700 shadow-sm transition">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+    <template x-for="t in toasts" :key="t.id">
+      <div 
+        class="bg-white border border-slate-200 text-slate-800 text-xs font-mono px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 pointer-events-auto transition-all"
+        x-text="t.text"
+      ></div>
+    </template>
+  </div>
+
+  <!-- Alpine.js Application Controller & 2D Waveform Visualizer -->
+  <script>
+    function nextSight() {
+      return {
+        state: {
+          esp32_ip: null,
+          audio_state: 'IDLE',
+          vision_mode_active: false,
+          pipeline_status: 'Ready',
+          latest_latency: {
+            vad_to_stt: 0,
+            llm_first_token: 0,
+            tts_first_chunk: 0,
+            total: 0
+          },
+          chat_history: [],
+          gallery_images: [],
+          notes: [],
+          latest_frame_url: '',
+          system_time: ''
+        },
+        queryText: '',
+        noteInputText: '',
+        isDragging: false,
+        modalUrl: null,
+        toasts: [],
+        lastChatLen: 0,
+        lastNotesLen: 0,
+        lastWeatherStr: '',
+        lastTimersLen: 0,
+        lastPlaybackStreaming: false,
+
+        initApp() {
+          this.fetchState();
+          // Poll strictly every 250ms for ultra-responsive non-blocking updates
+          setInterval(() => this.fetchState(), 250);
+
+          this.$nextTick(() => {
+            lucide.createIcons();
+            this.initWaveformCanvas();
+          });
+        },
+
+        initWaveformCanvas() {
+          const canvas = document.getElementById('audioWaveformCanvas');
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          let phase = 0;
+
+          const render = () => {
+            const width = canvas.width = canvas.offsetWidth * (window.devicePixelRatio || 1);
+            const height = canvas.height = canvas.offsetHeight * (window.devicePixelRatio || 1);
+            ctx.clearRect(0, 0, width, height);
+
+            const isHotMic = this.state.audio_state === 'ACTIVE_LISTENING';
+            phase += isHotMic ? 0.08 : 0.02;
+
+            const centerY = height / 2;
+            const numPoints = 120;
+
+            // Gradient stroke configuration
+            const grad = ctx.createLinearGradient(0, 0, width, 0);
+            if (isHotMic) {
+              grad.addColorStop(0, '#6366f1');    // Indigo 500
+              grad.addColorStop(0.5, '#8b5cf6');  // Violet 500
+              grad.addColorStop(1, '#ec4899');    // Pink 500
+            } else {
+              grad.addColorStop(0, '#475569');    // Slate 600
+              grad.addColorStop(0.5, '#64748b');  // Slate 500
+              grad.addColorStop(1, '#475569');
+            }
+
+            // Draw primary voice wave
+            ctx.beginPath();
+            ctx.lineWidth = isHotMic ? 2.5 * (window.devicePixelRatio || 1) : 1.5 * (window.devicePixelRatio || 1);
+            ctx.strokeStyle = grad;
+            ctx.lineCap = 'round';
+
+            for (let i = 0; i <= numPoints; i++) {
+              const x = (i / numPoints) * width;
+              let y = centerY;
+              if (isHotMic) {
+                // Multi-sine undulating voice waveform with tapering envelope
+                const envelope = Math.sin((i / numPoints) * Math.PI);
+                const wave1 = Math.sin(i * 0.16 + phase) * 20;
+                const wave2 = Math.sin(i * 0.32 - phase * 1.4) * 12;
+                const wave3 = Math.cos(i * 0.08 + phase * 0.7) * 8;
+                y = centerY + (wave1 + wave2 + wave3) * envelope * (height / 70);
+              } else {
+                // Subtle resting flatline wave
+                const envelope = Math.sin((i / numPoints) * Math.PI);
+                y = centerY + Math.sin(i * 0.1 + phase) * 3 * envelope;
+              }
+
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // When Hot Mic is capturing, draw a secondary harmonic wave
+            if (isHotMic) {
+              ctx.beginPath();
+              ctx.lineWidth = 1.2 * (window.devicePixelRatio || 1);
+              ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
+              for (let i = 0; i <= numPoints; i++) {
+                const x = (i / numPoints) * width;
+                const envelope = Math.sin((i / numPoints) * Math.PI);
+                const wave = Math.sin(i * 0.24 - phase * 1.2) * 16;
+                const y = centerY + wave * envelope * (height / 70);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+            }
+
+            requestAnimationFrame(render);
+          };
+          requestAnimationFrame(render);
+        },
+
+        async fetchState() {
+          try {
+            const res = await fetch('/api/state');
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            // Only update reactive properties to prevent unnecessary DOM repaints
+            this.state = data;
+
+            // Auto-scroll chat box when new messages arrive
+            if (data.chat_history && data.chat_history.length !== this.lastChatLen) {
+              this.lastChatLen = data.chat_history.length;
+              this.$nextTick(() => {
+                if (this.$refs.chatBox) {
+                  this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
+                }
+                lucide.createIcons();
+              });
+            }
+
+            // Auto-refresh icons when notes change
+            if (data.notes && data.notes.length !== this.lastNotesLen) {
+              this.lastNotesLen = data.notes.length;
+              this.$nextTick(() => lucide.createIcons());
+            }
+
+            // Auto-refresh icons when weather updates
+            if (data.latest_weather && JSON.stringify(data.latest_weather) !== this.lastWeatherStr) {
+              this.lastWeatherStr = JSON.stringify(data.latest_weather);
+              this.$nextTick(() => lucide.createIcons());
+            }
+
+            // Auto-refresh icons when timers change
+            if (data.active_timers && data.active_timers.length !== this.lastTimersLen) {
+              this.lastTimersLen = data.active_timers.length;
+              this.$nextTick(() => lucide.createIcons());
+            }
+
+            // Auto-refresh icons when playback streaming state changes
+            if (data.is_playback_streaming !== this.lastPlaybackStreaming) {
+              this.lastPlaybackStreaming = data.is_playback_streaming;
+              this.$nextTick(() => lucide.createIcons());
+            }
+          } catch (e) {
+            console.error('State sync error:', e);
+          }
+        },
+
+        async simulateTouch(action) {
+          try {
+            const res = await fetch('/api/simulate/touch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action })
+            });
+            const data = await res.json();
+            this.showToast(`👆 [Touch ${action.toUpperCase()}]: ${data.message || data.status}`);
+            this.fetchState();
+          } catch (e) {
+            this.showToast(`❌ Touch error: ${e.message}`);
+          }
+        },
+
+        async sendQuery() {
+          const text = this.queryText.trim();
+          if (!text) return;
+          this.queryText = '';
+          this.showToast(`🧪 Transmitting query: "${text}"`);
+
+          try {
+            await fetch('/api/simulate/text-query', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text })
+            });
+            this.fetchState();
+          } catch (e) {
+            this.showToast(`❌ Query error: ${e.message}`);
+          }
+        },
+
+        handleDrop(e) {
+          this.isDragging = false;
+          if (e.dataTransfer.files.length > 0) {
+            this.uploadFile(e.dataTransfer.files[0]);
+          }
+        },
+
+        handleFileSelect(e) {
+          if (e.target.files.length > 0) {
+            this.uploadFile(e.target.files[0]);
+          }
+        },
+
+        async uploadFile(file) {
+          this.showToast(`📸 Injecting "${file.name}" into RAM buffer...`);
+          const formData = new FormData();
+          formData.append('file', file);
+
+          try {
+            const res = await fetch('/api/simulate/upload-frame', {
+              method: 'POST',
+              body: formData
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast(`✅ Frame Injected (${(data.bytes/1024).toFixed(1)} KB)`);
+              this.fetchState();
+            } else {
+              this.showToast(`❌ Injection failed: ${data.message}`);
+            }
+          } catch (e) {
+            this.showToast(`❌ Upload error: ${e.message}`);
+          }
+        },
+
+        openModal(url) {
+          this.modalUrl = url;
+        },
+
+        async deleteSnapshot(url) {
+          if (!url) return;
+          try {
+            const res = await fetch('/api/gallery/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast('🗑️ Snapshot removed');
+              this.modalUrl = null;
+              this.fetchState();
+            }
+          } catch (e) {
+            this.showToast(`❌ Delete error: ${e.message}`);
+          }
+        },
+
+        getLatencyClass(val) {
+          if (!val || val <= 0) return 'text-slate-400';
+          if (val < 2.0) return 'text-emerald-600';
+          if (val <= 3.0) return 'text-amber-600';
+          return 'text-rose-600';
+        },
+
+        async addNote() {
+          const text = this.noteInputText.trim();
+          if (!text) return;
+          this.noteInputText = '';
+          try {
+            const res = await fetch('/api/notes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast('📝 Note saved!');
+              this.fetchState();
+            }
+          } catch (e) {
+            this.showToast(`❌ Failed to save note: ${e.message}`);
+          }
+        },
+
+        async deleteNote(noteId) {
+          try {
+            const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast('🗑️ Note deleted');
+              this.fetchState();
+            }
+          } catch (e) {
+            this.showToast(`❌ Error deleting note: ${e.message}`);
+          }
+        },
+
+        async clearNotes() {
+          try {
+            await fetch('/api/notes/clear', { method: 'POST' });
+            this.showToast('🧹 All notes cleared');
+            this.fetchState();
+          } catch (e) {
+            this.showToast(`❌ Error: ${e.message}`);
+          }
+        },
+
+        copyNote(text) {
+          navigator.clipboard.writeText(text);
+          this.showToast('📋 Note copied to clipboard');
+        },
+
+        async fetchWeather(city = null) {
+          const url = city ? `/api/weather?city=${encodeURIComponent(city)}` : '/api/weather';
+          this.showToast('🌤️ Querying Open-Meteo live weather...');
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.state.latest_weather = data.weather;
+              this.showToast(`🌤️ [Weather]: ${data.weather.city} ${data.weather.temperature}°C • ${data.weather.condition}`);
+              this.$nextTick(() => lucide.createIcons());
+            } else {
+              this.showToast(`❌ Weather error: ${data.message}`);
+            }
+          } catch (e) {
+            this.showToast(`❌ Weather error: ${e.message}`);
+          }
+        },
+
+        async createTimer(sec, label = "Timer", isReminder = false) {
+          try {
+            const res = await fetch('/api/timers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ duration_sec: sec, label: label, is_reminder: isReminder })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast(`⏱️ Timer set for ${data.timer.duration_str}!`);
+              this.fetchState();
+            }
+          } catch (e) {
+            this.showToast(`❌ Failed to set timer: ${e.message}`);
+          }
+        },
+
+        async cancelTimer(timerId) {
+          try {
+            const res = await fetch(`/api/timers/${timerId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast('⏱️ Timer cancelled');
+              this.fetchState();
+            }
+          } catch (e) {
+            this.showToast(`❌ Error cancelling timer: ${e.message}`);
+          }
+        },
+
+        async clearTimers() {
+          try {
+            await fetch('/api/timers/clear', { method: 'POST' });
+            this.showToast('⏱️ All timers cancelled');
+            this.fetchState();
+          } catch (e) {
+            this.showToast(`❌ Error: ${e.message}`);
+          }
+        },
+
+        async triggerBargeIn() {
+          try {
+            const res = await fetch('/api/playback/barge-in', { method: 'POST' });
+            const data = await res.json();
+            this.showToast('⚡ [Barge-In]: Audio playback stopped immediately.');
+            this.fetchState();
+          } catch (e) {
+            this.showToast(`❌ Barge-In error: ${e.message}`);
+          }
+        },
+
+        showToast(text) {
+          const id = Date.now();
+          this.toasts.push({ id, text });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3200);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
